@@ -5,21 +5,28 @@ function BombObj(Type, Index, Movement) {
     this.type = Type;
     this.index = Index;
     this.movement = Movement;
+    this.annimate = undefined;
 }
 
 function TileBomber() {
     this.__proto__ = new Engine(undefined, " ", " ");
     this.player1 = {
+        "type": "1",
         "index": undefined,
         "facing": "b",
         "toDirection": {"-1,0": "a", "1,0": "b", "0,-1": "c", "0,1": "d"},
         "bomb": "*",
+        "score": 0,
+        "scoreEL": document.getElementById("p1Score"),
     };
     this.player2 = {
+        "type": "2",
         "index": undefined,
         "facing": "A",
         "toDirection": {"-1,0": "A", "1,0": "B", "0,-1": "C", "0,1": "D"},
         "bomb": "+",
+        "score": 0,
+        "scoreEL": document.getElementById("p2Score"),
     };
     this.bombs = {};
     this.keyInput = {
@@ -47,21 +54,8 @@ function TileBomber() {
                 }
             }
             else if (Input) {
-                let player = Input.player;
-                this.Environment.cell[player.index.toString()] = player.bomb;
-                let bomb = new BombObj(
-                    player.bomb, player.index, new IndexObj(0, 0));
-                this.bombs[player.index.toString()] = bomb;
-                setTimeout(this.explode.bind(this), 2000, bomb);
+                this.dropBomb(Input.player);
             }
-        },
-    };
-    this.convert = {
-        "toMovement": {
-            "^": new IndexObj(-1,0),
-            "v": new IndexObj(1,0),
-            "<": new IndexObj(0,-1),
-            ">": new IndexObj(0,1)
         },
     };
     this.parseLevelFile = function*(levelFile) {
@@ -85,6 +79,8 @@ function TileBomber() {
             let emptyLocations = this.Environment.cellLocations[" "];
             this.player1.index = emptyLocations[0];
             this.player2.index = emptyLocations[emptyLocations.length - 1];
+            this.Environment.cell[this.player1.index] = this.player1.type;
+            this.Environment.cell[this.player2.index] = this.player2.type;
             this.replaceImage(this.player1.index, this.player1.facing);
             this.replaceImage(this.player2.index, this.player2.facing);
         }
@@ -97,6 +93,15 @@ function TileBomber() {
             document.getElementById("levels").className = "Hidden";
         }
     };
+    this.dropBomb = function(player) {
+        // Prevent multiple bomb drops on single cell.
+        if (this.Environment.cell[player.index.toString()] === player.type) {
+            this.Environment.cell[player.index.toString()] = player.bomb;
+            let bomb = new BombObj(player.bomb, player.index, undefined);
+            this.bombs[player.index.toString()] = bomb;
+            setTimeout(this.explode.bind(this), 1500, bomb);
+        }
+    };
     this.blast = function(Index, range, Movement, imgVal) {
         if (!range) return;
         let toIndex = Index.add(Movement);
@@ -106,11 +111,21 @@ function TileBomber() {
             setTimeout(this.blast.bind(this), 20, toIndex,
                        range - 1, Movement, imgVal);
         }
+        else if (toCell === "@" && imgVal === "&") {
+            this.Environment.cell[toIndex] = " ";
+            this.replaceImage(toIndex, imgVal);
+        }
+        else if (imgVal === "&" && (toCell === "1" || toCell === "2")) {
+            let player = toCell === "1" ? this.player2 : this.player1;
+            player.scoreEL.innerHTML = `Player ${player.type}: ${++player.score}`;
+            this.replaceCell(toIndex, "!");
+        }
     };
     this.explode = function(bomb) {
         let Index = bomb.index;
         this.replaceCell(Index, " ")
         delete this.bombs[Index.toString()];
+        clearTimeout(bomb.annimate);
         this.replaceImage(Index, "&");
         setTimeout(this.blast.bind(this), 20, Index, 2, new IndexObj(-1, 0), "&");
         setTimeout(this.blast.bind(this), 20, Index, 2, new IndexObj(1, 0), "&");
@@ -123,16 +138,14 @@ function TileBomber() {
         setTimeout(this.blast.bind(this), 200, Index, 2, new IndexObj(0, 1), " ");
     };
     this.movePlayer = function(player, moveTo, Movement) {
-        let otherPlayer = player === this.player1 ? this.player2: this.player1;
-        if (moveTo.equal(otherPlayer.index)) {
-            this.changeFacing(player, moveTo, Movement);
-        }
-        else {
-            let Facing = player.toDirection[Movement.toString()];
-            this.placePlayer(player.index, moveTo, Facing)
-            player.index = moveTo;
-            player.facing = Facing;
-        }
+        let Facing = player.toDirection[Movement.toString()];
+        let onCell = (this.Environment.cell[player.index] === player.bomb
+                      ? player.bomb : " ");
+        this.replaceCell(player.index, onCell);
+        this.Environment.cell[moveTo] = player.type;
+        this.replaceImage(moveTo, Facing);
+        player.index = moveTo;
+        player.facing = Facing;
     };
     this.changeFacing = function(player, _, Movement) {
         this.movePlayer(player, player.index, Movement);
@@ -143,10 +156,11 @@ function TileBomber() {
             this.replaceCell(bomb.index, " ");
             this.replaceCell(toIndex, bomb.type);
             bomb.index = toIndex;
-            setTimeout(this.moveBomb.bind(this), 80, bomb);
+            bomb.annimate = setTimeout(this.moveBomb.bind(this), 80, bomb);
         }
     }
     this.pushBomb = function(player, moveTo, Movement) {
+        this.changeFacing(player, moveTo, Movement);
         if (player.bomb === this.Environment.cell[moveTo.toString()]) {
             let bomb = this.bombs[moveTo.toString()];
             bomb.movement = Movement;
@@ -158,7 +172,11 @@ function TileBomber() {
         let Tile = {
             " ": {"image": getImg("Empty"), "action": this.movePlayer},
             "#": {"image": getImg("Wall"), "action": this.changeFacing},
+            "@": {"image": getImg("Brick"), "action": this.changeFacing},
+            "1": {"image": getImg("p1Up"), "action": this.changeFacing},
+            "2": {"image": getImg("p1Down"), "action": this.changeFacing},
             "&": {"image": getImg("Blast"), "action": undefined},
+            "!": {"image": getImg("Death"), "action": undefined},
             "a": {"image": getImg("p1Up"), "action": undefined},
             "b": {"image": getImg("p1Down"), "action": undefined},
             "c": {"image": getImg("p1Left"), "action": undefined},
