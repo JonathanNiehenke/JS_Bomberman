@@ -1,0 +1,10 @@
+img {
+    vertical-align: top;  /* Removes the white space below the image.*/
+    margin: 1px;
+}
+.Hidden {
+    display: none;
+}
+.packLeft {
+    float: left;
+}
