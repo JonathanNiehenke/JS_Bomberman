@@ -121,21 +121,32 @@ function TileBomber() {
             this.replaceCell(toIndex, "!");
         }
     };
+    this.setBlast = function(Time, Index, Range, imgVal) {
+        let Directions = [new IndexObj(-1, 0), new IndexObj(1, 0),
+                          new IndexObj(0, -1), new IndexObj(0, 1)];
+        for (Movement of Directions) {
+            setTimeout(
+                this.blast.bind(this),Time, Index, Range, Movement, imgVal);
+        }
+    }
     this.explode = function(bomb) {
-        let Index = bomb.index;
-        this.replaceCell(Index, " ")
-        delete this.bombs[Index.toString()];
-        clearTimeout(bomb.annimate);
-        this.replaceImage(Index, "&");
-        setTimeout(this.blast.bind(this), 20, Index, 2, new IndexObj(-1, 0), "&");
-        setTimeout(this.blast.bind(this), 20, Index, 2, new IndexObj(1, 0), "&");
-        setTimeout(this.blast.bind(this), 20, Index, 2, new IndexObj(0, -1), "&");
-        setTimeout(this.blast.bind(this), 20, Index, 2, new IndexObj(0, 1), "&");
-        setTimeout(this.replaceImage.bind(this), 180, Index, " ");
-        setTimeout(this.blast.bind(this), 200, Index, 2, new IndexObj(-1, 0), " ");
-        setTimeout(this.blast.bind(this), 200, Index, 2, new IndexObj(1, 0), " ");
-        setTimeout(this.blast.bind(this), 200, Index, 2, new IndexObj(0, -1), " ");
-        setTimeout(this.blast.bind(this), 200, Index, 2, new IndexObj(0, 1), " ");
+        clearTimeout(bomb.annimate);  // Stops a moving bomb.
+        if (this.player1.index == bomb.index ||
+            this.player2.index == bomb.index)
+        {
+            this.replaceCell(bomb.index, "!");
+            let player = (this.player1.index == bomb.index
+                          ? this.player2 : this.player1);
+            let playerScoreMsg = `Player ${player.type}: ${++player.score}`
+            player.scoreEL.innerHTML = playerScoreMsg;
+        }
+        else {
+            this.replaceCell(bomb.index, " ")
+            this.replaceImage(bomb.index, "&");
+            setTimeout(this.replaceImage.bind(this), 180, bomb.index, " ");
+        }
+        this.setBlast(20, bomb.index, 2, "&");  // Actual blast;
+        this.setBlast(200, bomb.index, 2, " ");  // Blast removal;
     };
     this.movePlayer = function(player, moveTo, Movement) {
         let Facing = player.toDirection[Movement.toString()];
@@ -148,7 +159,8 @@ function TileBomber() {
         player.facing = Facing;
     };
     this.changeFacing = function(player, _, Movement) {
-        this.movePlayer(player, player.index, Movement);
+        let Facing = player.toDirection[Movement.toString()];
+        this.replaceImage(player.index, Facing);
     };
     this.moveBomb = function(bomb) {
         let toIndex = bomb.index.add(bomb.movement);
