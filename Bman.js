@@ -1,15 +1,16 @@
 let db = console.log;
 let dbo = console.table;
 
-function BombObj(Type, Index, Movement) {
+function BombObj(Type, Index) {
     this.type = Type;
     this.index = Index;
-    this.movement = Movement;
+    this.movement = undefined;
     this.annimate = undefined;
 }
 
 function TileBomber() {
     this.__proto__ = new Engine(undefined, " ", " ");
+    // Create player constructor.
     this.player1 = {
         "type": "1",
         "index": undefined,
@@ -28,7 +29,7 @@ function TileBomber() {
         "score": 0,
         "scoreEL": document.getElementById("p2Score"),
     };
-    this.bombs = {};
+    this.bombs = {};  // Must find another way.
     this.keyInput = {
         "38": {"player": this.player1, "Movement": new IndexObj(-1, 0)},
         "40": {"player": this.player1, "Movement": new IndexObj(1, 0)},
@@ -67,7 +68,7 @@ function TileBomber() {
                 // Previous references are gone.
                 Structure = [];
             }
-            else {
+            else if (Line && Line[0] !== "/") {
                 Structure.push(Line);
             }
         }
@@ -97,7 +98,7 @@ function TileBomber() {
         // Prevent multiple bomb drops on single cell.
         if (this.Environment.cell[player.index.toString()] === player.type) {
             this.Environment.cell[player.index.toString()] = player.bomb;
-            let bomb = new BombObj(player.bomb, player.index, undefined);
+            let bomb = new BombObj(player.bomb, player.index);
             this.bombs[player.index.toString()] = bomb;
             setTimeout(this.explode.bind(this), 1500, bomb);
         }
@@ -170,13 +171,26 @@ function TileBomber() {
             bomb.index = toIndex;
             bomb.annimate = setTimeout(this.moveBomb.bind(this), 80, bomb);
         }
+        else {
+            bomb.annimate = undefined;
+        }
     }
     this.pushBomb = function(player, moveTo, Movement) {
+        // Two annimations for one bomb, an annimation does not expode.
+        // Error when bomb is repushed.
         this.changeFacing(player, moveTo, Movement);
-        if (player.bomb === this.Environment.cell[moveTo.toString()]) {
-            let bomb = this.bombs[moveTo.toString()];
+        let bomb = this.bombs[moveTo.toString()];
+        try {
+            console.log(bomb.index, " get: ", bomb.annimate);
+        }
+        catch (err) {
+            console.log(bomb, moveTo.toString());
+            console.log(err);
+        }
+        if (bomb.type === player.bomb && !bomb.annimate) {
             bomb.movement = Movement;
             this.moveBomb(bomb);
+            console.log(bomb.index, "set: ", bomb.annimate);
         }
     };
     this.__constructTiles = function() {
